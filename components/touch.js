@@ -366,6 +366,9 @@ function nTouch(container, options) {
     			if (isValidSlide) {
     				// this variable keep how many units to slide
 		    		var swiped = options.sticky ? 1 : Math.round(Math.abs(delta.x+inertia)/width);
+
+		    		// what if swiped is larger than the number of total units?  swiped <= hidden
+		    		swiped = swiped < hidden ? swiped : hidden;
 		    		console.log('hidden: ' + hidden  + ' headIndex: ' + headIndex + ' swiped: ' + swiped + '			precise: ' + Math.abs(delta.x+inertia)/width);
 
 		    		// circulate units if necessary
@@ -577,7 +580,7 @@ if ( window.jQuery || window.Zepto ) {
 		window.mySwipe = nTouch(document.getElementById('nrelate'), {
 			continuous	: true,
 			sticky		: false,
-			smoothness	: 30,    // [0, 100]
+			smoothness	: 100,   // [0, 100]
 			reveal	  	: 2,     // [1, 4]
 			preview   	: 0.3    // [0, 0.5]
 		});
