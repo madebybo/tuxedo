@@ -10,16 +10,7 @@
  */
 
 function nTouch(container, options) {
-
 	"use strict";
-
-	var meta = document.createElement('meta'),
-		node = document.getElementsByTagName('meta')[0];
-
-	meta.setAttribute('name', 'viewport');
-	meta.setAttribute('content', 'initial-scale=1');
-
-	node.parentNode.insertBefore(meta, node);
 
 	// utilities
 	var noop = function() {}; // simple no operation function
@@ -42,31 +33,42 @@ function nTouch(container, options) {
 	// quit if no root inner
 	if (!container) return;
 
-	// get the parent of the "slides", in this case, each unit
-	var inner = nRelate.xgebcn('nr_inner', 'div', container)[0],
-		title = nRelate.xgebcn('nr_title', 'h3', container)[0],
+	// adding name meta tag for prevent zooming bug in iOS
+	var meta = document.createElement('meta'),
+		node = document.getElementsByTagName('meta')[0];
+
+	meta.setAttribute('name', 'viewport');
+	meta.setAttribute('content', 'initial-scale=1');
+	node.parentNode.insertBefore(meta, node);
+
+	// accessing widget nodes and cache key elements
+	var title = nRelate.xgebcn('nr_title', 'h3', container)[0],
+		inner = nRelate.xgebcn('nr_inner', 'div', container)[0],
 		about = nRelate.xgebcn('nr_about', 'span', container)[0];
 
+	// remove last div, inner should only contain slides and cache slides
 	inner.removeChild(inner.lastChild);
-
-	var slides = inner.children, // cache slides
-		length = slides.length,
-		slidePos, width, innerWidth, outerWidth, offset;
-
 	options = options || {};
-	var index = parseInt(options.startSlide, 10) || 0;
-	var speed = options.speed || 300;
-	var reveal = options.reveal || 2; // reveal is the number of complete units being shown
-	var preview = options.preview || 0.4; // how much the preview should be in total
-	var hidden = length - reveal - 1;
-	var smoothness = options.smoothness || 100;
+
+	// initialize options
+	var slides = inner.children,
+		index = parseInt(options.startSlide, 10) || 0,
+		speed = options.speed || 300,
+		reveal = options.reveal || 2, // reveal is the number of complete units being shown
+		preview = options.preview || 0.4, // how much the preview should be in total
+		hidden = slides.length - reveal - 1,
+		smoothness = options.smoothness || 100,
+		leftPos = options.leftPos || 0;
+
 	options.continuous = options.continuous !== undefined ? options.continuous : true;
 	options.sticky = options.sticky !== undefined ? options.sticky : true;
 
-	function setup() {
+	// global property variables
+	var slidePos, width, innerWidth, outerWidth, offset;
 
-		// set continuous to false if only one slide
-		if (slides.length < 2) options.continuous = false;
+	function setup() {
+		// set continuous to false if no hidden units are at disposal
+		if (hidden < 1) options.continuous = false;
 
 		//special case if two slides
 		if (browser.transitions && options.continuous && slides.length < 3) {
@@ -78,24 +80,8 @@ function nTouch(container, options) {
 		// create an array to store current positions of each slide
 		slidePos = new Array(slides.length);
 
-		// start detecting orientation
-		var orientation = window.orientation;
-
-		if (orientation === 0 || orientation === 180) orientation = 'portrait';
-		else if (Math.abs(orientation) === 90) orientation = 'landscape';
-		else {
-			// JavaScript orientation not supported. Work it out.
-			if (window.innerWidth > window.innerHeight)
-				orientation = 'landscape';
-			else
-				orientation = 'portrait';
-		}
-
-		// alert(orientation + ': ' + screen.width);
-
+		/* update screen width based on orientation detection */
 		outerWidth = screen.width;
-
-		// https://github.com/ten1seven/jRespond/issues/1
 
 		if (window.innerWidth > window.innerHeight) {
 			// Landscape. Take larger of the two dimensions.
@@ -105,77 +91,52 @@ function nTouch(container, options) {
 			outerWidth = (screen.width > screen.height) ? screen.height : screen.width;
 		}
 
-		// decide the screen width, container width, and unit width
-		innerWidth = container.parentNode.getBoundingClientRect().width || container.parentNode.offsetWidth;
+		// decide the container width, and unit width
+		container.style.width = 'auto';  // reset width to default first
+		innerWidth = container.getBoundingClientRect().width || container.offsetWidth;
+		offset = Math.round((outerWidth - innerWidth) / 2) || 15;
 		width = Math.round(outerWidth / (reveal + preview));
-		offset = Math.round((outerWidth - innerWidth) / 2);
-
-		console.log(offset + ' ' + innerWidth + ' ' + outerWidth);
-
-		// deal with the case that padding is used on parent element, set a default offset
-		if (offset === 0) {
-			offset = 15; // give it a default padding to show preview of the previous unit
-		}
 
 		console.log(offset + ' ' + innerWidth + ' ' + outerWidth);
 
 		/*
-		 * reposition container and set width equal to screen size, try not give container a fixed width, same thing for offset
-		 * trade off is if widget is placed in a not-full-width containing div, units won't extend to the edge
+		 * reposition container, title, inner and disclaimer
+		 * we always want to make the container full screen, do nothing if that's already the case
+		 * otherwise set the value, shift left so container could be contered
 		 */
-
-		translate(container, -offset, 0);
 
 		container.style.width = outerWidth + 'px';
 		container.style.overflow = "hidden";
 
+		// make sure container fit the screen entirely
+		translate(container, -offset, 0);
+
 		// set width for the slider container, which is nr_inner, *10 to make sure extra padding/margin won't break layout
 		title.style.marginLeft = offset + 'px';
+		inner.style.marginLeft = (leftPos ? leftPos : offset) + 'px';
 		inner.style.width = (slides.length * width * 2) + 'px';
-		inner.style.marginLeft = offset > options.leftPos ? offset : options.leftPos + 'px';
-		about.style.right = offset > options.leftPos ? offset : options.leftPos + 'px';
-		about.style.width = innerWidth + 'px';
+		about.style.right = offset + 'px';
+		about.style.width = outerWidth + 'px';
 
 		// reposition unit after orientation changes
 		inner.style.left = -width * headIndex + 'px';
 
-		// stack inners
+		// set width for every slide
 		var pos = slides.length;
 
-		// set slide width and data-index
 		while (pos--) {
 			var slide = slides[pos];
-
 			slide.style.width = width + 'px';
-			slide.setAttribute('data-index', pos);
-
-			if (browser.transitions) {
-				// slide.style.left = (pos * -width) + 'px';
-				// move(pos, index > pos ? -width : (index < pos ? width : 0), 0);
-
-				/* the second parameter being the amount of distance moved for that single unit, 
-				 * it will also be stored as the CURRENT position for that unit
-				 */
-				move(pos, 0, 0);
-			}
 		}
 
-		// reposition inners before and after index
-		if (options.continuous && browser.transitions) {
-			// move(circle(index-1), -width, 0);
-			// move(circle(index+1), width, 0);
-		}
-
-		// if (!browser.transitions) inner.style.left = (index * -width) + 'px';
-		if (!browser.transitions) inner.style.left = (0) + 'px';
 	}
 
 	function circulate(direction, num) {
 		for (var i = 0; i < num; i++) {
 			if (direction === 'left')
-				inner.insertBefore(slides[0], slides[length - 1].nextSibling);
+				inner.insertBefore(slides[0], slides[slides.length - 1].nextSibling);
 			if (direction === 'right')
-				inner.insertBefore(slides[length - 1], slides[0]);
+				inner.insertBefore(slides[slides.length - 1], slides[0]);
 		}
 	}
 
@@ -518,37 +479,6 @@ function nTouch(container, options) {
 	// trigger setup
 	setup();
 
-	function restoreZoom() {
-		var landscape = Math.abs(window.orientation) === 90,
-			screenWidth;
-
-		if (landscape) {
-			// Landscape. Take larger of the two dimensions.
-			screenWidth = (screen.width > screen.height) ? screen.width : screen.height;
-		} else {
-			// Take smaller of the two dimensions
-			screenWidth = (screen.width > screen.height) ? screen.height : screen.width;
-		}
-
-		outerWidth = screenWidth;
-
-		width = Math.round(outerWidth / (reveal + preview));
-		inner.style.left = -width * headIndex + 'px';
-
-		// alert( outerWidth + ' : ' + width );
-
-		container.style.width = outerWidth + 'px';
-
-		// set slide width and data-index
-
-		var pos = slides.length;
-
-		while (pos--) {
-			var slide = slides[pos];
-			slide.style.width = width + 'px';
-		}
-	}
-
 	// start auto slideshow if applicable
 	if (delay) begin();
 
@@ -567,8 +497,6 @@ function nTouch(container, options) {
 
 		// set resize event on window
 		window.addEventListener('resize', events, false);
-		// window.addEventListener('orientationchange', restoreZoom, false);
-
 	} else {
 		window.onresize = function() {
 			setup();
@@ -662,7 +590,7 @@ if (window.jQuery || window.Zepto) {
 			smoothness: 100, // [0, 100]
 			reveal: 2, // [1, 4]
 			preview: 0.3, // [0, 0.5]
-			leftPos: 23
+			leftPos: 23 // space to border for header/disclaimer
 		});
 	} else {
 		setTimeout(function() {
