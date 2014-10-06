@@ -1,21 +1,31 @@
 /*
-* @nTouch.js - the nRelate mobile utility library
-* @version 1.0.0
-*
-* @author Bo Wang (bo.wang@nrelate.com)
-* @forked from Swipe.js (https://github.com/thebird/Swipe)
-*
-* Copyright (c) 2014 nRelate
-*
-*/
+ * @nTouch.js - the nRelate mobile utility library
+ * @version 2.0.1
+ *
+ * @author Bo Wang (bo.wang@nrelate.com)
+ * @forked from Swipe.js (https://github.com/thebird/Swipe)
+ *
+ * Copyright (c) 2014 nRelate
+ *
+ */
 
 function nTouch(container, options) {
 
 	"use strict";
-	
+
+	var meta = document.createElement('meta'),
+		node = document.getElementsByTagName('meta')[0];
+
+	meta.setAttribute('name', 'viewport');
+	meta.setAttribute('content', 'initial-scale=1');
+
+	node.parentNode.insertBefore(meta, node);
+
 	// utilities
 	var noop = function() {}; // simple no operation function
-	var offloadFn = function(fn) { setTimeout(fn || noop, 0) }; // offload a functions execution
+	var offloadFn = function(fn) {
+		setTimeout(fn || noop, 0)
+	}; // offload a functions execution
 
 	// check browser capabilities
 	var browser = {
@@ -23,8 +33,9 @@ function nTouch(container, options) {
 		touch: ('ontouchstart' in window) || window.DocumentTouch && document instanceof DocumentTouch,
 		transitions: (function(temp) {
 			var props = ['transitionProperty', 'WebkitTransition', 'MozTransition', 'OTransition', 'msTransition'];
-			for ( var i in props ) if (temp.style[ props[i] ] !== undefined) return true;
-				return false;
+			for (var i in props)
+				if (temp.style[props[i]] !== undefined) return true;
+			return false;
 		})(document.createElement('swipe'))
 	};
 
@@ -32,31 +43,28 @@ function nTouch(container, options) {
 	if (!container) return;
 
 	// get the parent of the "slides", in this case, each unit
-	// var inner = container.children[0].children[1];
-	var inner = nRelate.xgebcn('nr_inner', 'div', container)[0];
-	var title = nRelate.xgebcn('nr_title', 'h3', container)[0];
-	var about = nRelate.xgebcn('nr_about', 'span')[0];
+	var inner = nRelate.xgebcn('nr_inner', 'div', container)[0],
+		title = nRelate.xgebcn('nr_title', 'h3', container)[0],
+		about = nRelate.xgebcn('nr_about', 'span', container)[0];
 
 	inner.removeChild(inner.lastChild);
 
-	var slides, slidePos, width, innerWidth, outerWidth, offset, length;
-
-	// cache slides
-	slides = inner.children;
-	length = slides.length;
+	var slides = inner.children, // cache slides
+		length = slides.length,
+		slidePos, width, innerWidth, outerWidth, offset;
 
 	options = options || {};
 	var index = parseInt(options.startSlide, 10) || 0;
 	var speed = options.speed || 300;
-	var reveal  = options.reveal || 2;      // reveal is the number of complete units being shown
-	var preview = options.preview || 0.4;   // how much the preview should be in total
-	var hidden  = length - reveal - 1;
+	var reveal = options.reveal || 2; // reveal is the number of complete units being shown
+	var preview = options.preview || 0.4; // how much the preview should be in total
+	var hidden = length - reveal - 1;
 	var smoothness = options.smoothness || 100;
 	options.continuous = options.continuous !== undefined ? options.continuous : true;
 	options.sticky = options.sticky !== undefined ? options.sticky : true;
 
 	function setup() {
-		
+
 		// set continuous to false if only one slide
 		if (slides.length < 2) options.continuous = false;
 
@@ -70,11 +78,37 @@ function nTouch(container, options) {
 		// create an array to store current positions of each slide
 		slidePos = new Array(slides.length);
 
+		// start detecting orientation
+		var orientation = window.orientation;
+
+		if (orientation === 0 || orientation === 180) orientation = 'portrait';
+		else if (Math.abs(orientation) === 90) orientation = 'landscape';
+		else {
+			// JavaScript orientation not supported. Work it out.
+			if (window.innerWidth > window.innerHeight)
+				orientation = 'landscape';
+			else
+				orientation = 'portrait';
+		}
+
+		// alert(orientation + ': ' + screen.width);
+
+		outerWidth = screen.width;
+
+		// https://github.com/ten1seven/jRespond/issues/1
+
+		if (window.innerWidth > window.innerHeight) {
+			// Landscape. Take larger of the two dimensions.
+			outerWidth = (screen.width > screen.height) ? screen.width : screen.height;
+		} else if (window.innerHeight < window.innerWidth) {
+			// Take smaller of the two dimensions
+			outerWidth = (screen.width > screen.height) ? screen.height : screen.width;
+		}
+
 		// decide the screen width, container width, and unit width
 		innerWidth = container.parentNode.getBoundingClientRect().width || container.parentNode.offsetWidth;
-		outerWidth = (window.innerHeight > window.innerWidth) ? screen.width : screen.height;
-		width      = Math.round(outerWidth/(reveal+preview));
-		offset     = Math.round((outerWidth-innerWidth)/2);
+		width = Math.round(outerWidth / (reveal + preview));
+		offset = Math.round((outerWidth - innerWidth) / 2);
 
 		console.log(offset + ' ' + innerWidth + ' ' + outerWidth);
 
@@ -83,35 +117,45 @@ function nTouch(container, options) {
 			offset = 15; // give it a default padding to show preview of the previous unit
 		}
 
-		// reposition container and set width equal to screen size
-		translate( container, -offset, 0 );
+		console.log(offset + ' ' + innerWidth + ' ' + outerWidth);
+
+		/*
+		 * reposition container and set width equal to screen size, try not give container a fixed width, same thing for offset
+		 * trade off is if widget is placed in a not-full-width containing div, units won't extend to the edge
+		 */
+
+		translate(container, -offset, 0);
+
 		container.style.width = outerWidth + 'px';
 		container.style.overflow = "hidden";
 
 		// set width for the slider container, which is nr_inner, *10 to make sure extra padding/margin won't break layout
-    	inner.style.width      = (slides.length * width * 2) + 'px';
-    	inner.style.marginLeft = offset + 'px';
-    	title.style.marginLeft = offset + 'px';
-    	about.style.right      = offset + 'px';
-    	about.style.width 	   = innerWidth  + 'px';
-	
+		title.style.marginLeft = offset + 'px';
+		inner.style.width = (slides.length * width * 2) + 'px';
+		inner.style.marginLeft = offset > options.leftPos ? offset : options.leftPos + 'px';
+		about.style.right = offset > options.leftPos ? offset : options.leftPos + 'px';
+		about.style.width = innerWidth + 'px';
+
+		// reposition unit after orientation changes
+		inner.style.left = -width * headIndex + 'px';
+
 		// stack inners
-    	var pos = slides.length;
-    	
-    	// set slide width and data-index
-    	while(pos--) {
-    		var slide = slides[pos];
-    		
-    		slide.style.width = width + 'px';
-    		slide.setAttribute('data-index', pos);
-			
+		var pos = slides.length;
+
+		// set slide width and data-index
+		while (pos--) {
+			var slide = slides[pos];
+
+			slide.style.width = width + 'px';
+			slide.setAttribute('data-index', pos);
+
 			if (browser.transitions) {
-			 	// slide.style.left = (pos * -width) + 'px';
+				// slide.style.left = (pos * -width) + 'px';
 				// move(pos, index > pos ? -width : (index < pos ? width : 0), 0);
 
 				/* the second parameter being the amount of distance moved for that single unit, 
-				 * it will also be stored as the CURRENT position for that unit 
-				*/
+				 * it will also be stored as the CURRENT position for that unit
+				 */
 				move(pos, 0, 0);
 			}
 		}
@@ -124,27 +168,25 @@ function nTouch(container, options) {
 
 		// if (!browser.transitions) inner.style.left = (index * -width) + 'px';
 		if (!browser.transitions) inner.style.left = (0) + 'px';
-
-		container.style.visibility = 'visible';
 	}
 
-	function circulate( direction, num ) {
+	function circulate(direction, num) {
 		for (var i = 0; i < num; i++) {
-			if ( direction === 'left' )
-				inner.insertBefore(slides[0], slides[length-1].nextSibling);
-			if ( direction === 'right' )
-				inner.insertBefore(slides[length-1], slides[0]);
+			if (direction === 'left')
+				inner.insertBefore(slides[0], slides[length - 1].nextSibling);
+			if (direction === 'right')
+				inner.insertBefore(slides[length - 1], slides[0]);
 		}
 	}
 
 	function prev() {
-		if (options.continuous) slide(index-1);
-		else if (index) slide(index-1);
+		if (options.continuous) slide(index - 1);
+		else if (index) slide(index - 1);
 	}
 
 	function next() {
-		if (options.continuous) slide(index+1);
-		else if (index < slides.length - 1) slide(index+1);
+		if (options.continuous) slide(index + 1);
+		else if (index < slides.length - 1) slide(index + 1);
 	}
 
 	function circle(index) {
@@ -158,7 +200,7 @@ function nTouch(container, options) {
 		if (index == to) return;
 
 		if (browser.transitions) {
-			var direction = Math.abs(index-to) / (index-to); // 1: backward, -1: forward
+			var direction = Math.abs(index - to) / (index - to); // 1: backward, -1: forward
 
 			// get the actual position of the slide
 			if (options.continuous) {
@@ -167,13 +209,13 @@ function nTouch(container, options) {
 
 				// if going forward but to < index, use to = slides.length + to
 				// if going backward but to > index, use to = -slides.length + to
-				if (direction !== natural_direction) to =  -direction * slides.length + to;
+				if (direction !== natural_direction) to = -direction * slides.length + to;
 			}
 
-			var diff = Math.abs(index-to) - 1;
+			var diff = Math.abs(index - to) - 1;
 
 			// move all the slides between index and to in the right direction
-			while (diff--) move( circle((to > index ? to : index) - diff - 1), width * direction, 0);
+			while (diff--) move(circle((to > index ? to : index) - diff - 1), width * direction, 0);
 
 			to = circle(to);
 			move(index, width * direction, slideSpeed || speed);
@@ -192,27 +234,27 @@ function nTouch(container, options) {
 
 	function move(index, dist, speed) {
 		// translate(index, dist, speed);
-		translate( slides[index], dist, speed );
+		translate(slides[index], dist, speed);
 		slidePos[index] = dist;
 
-		console.log( dist );
+		console.log(dist);
 	}
 
 	function translate(node, dist, speed) {
 		var style = node && node.style;
 
 		if (!style) return;
-		
+
 		style.webkitTransitionDuration =
-		style.MozTransitionDuration =
-		style.msTransitionDuration =
-		style.OTransitionDuration =
-		style.transitionDuration = speed + 'ms';
+			style.MozTransitionDuration =
+			style.msTransitionDuration =
+			style.OTransitionDuration =
+			style.transitionDuration = speed + 'ms';
 
 		style.webkitTransform = 'translate(' + dist + 'px,0)' + 'translateZ(0)';
 		style.msTransform =
-		style.MozTransform =
-		style.OTransform = 'translateX(' + dist + 'px)';
+			style.MozTransform =
+			style.OTransform = 'translateX(' + dist + 'px)';
 	}
 
 	function animate(from, to, speed) {
@@ -228,7 +270,7 @@ function nTouch(container, options) {
 
 			if (timeElap > speed) {
 				inner.style.left = to + 'px';
-				
+
 				if (delay) begin();
 
 				options.transitionEnd && options.transitionEnd.call(event, index, slides[index]);
@@ -237,10 +279,10 @@ function nTouch(container, options) {
 				return;
 			}
 
-			inner.style.left = (( (to - from) * (Math.floor((timeElap / speed) * 100) / 100) ) + from) + 'px';
+			inner.style.left = (((to - from) * (Math.floor((timeElap / speed) * 100) / 100)) + from) + 'px';
 		}, 4);
 	}
-	
+
 	// setup auto slideshow
 	var delay = options.auto || 0;
 	var interval;
@@ -265,213 +307,248 @@ function nTouch(container, options) {
 	var events = {
 		handleEvent: function(event) {
 			switch (event.type) {
-				case 'touchstart': this.start(event); break;
-				case 'touchmove': this.move(event); break;
-				case 'touchend': offloadFn(this.end(event)); break;
+				case 'touchstart':
+					this.start(event);
+					break;
+				case 'touchmove':
+					this.move(event);
+					break;
+				case 'touchend':
+					offloadFn(this.end(event));
+					break;
 				case 'webkitTransitionEnd':
 				case 'msTransitionEnd':
 				case 'oTransitionEnd':
 				case 'otransitionend':
-				case 'transitionend': offloadFn(this.transitionEnd(event)); break;
-				case 'resize': offloadFn(setup); break;
+				case 'transitionend':
+					offloadFn(this.transitionEnd(event));
+					break;
+				case 'resize':
+					offloadFn(setup);
+					break;
 			}
 
 			if (options.stopPropagation) event.stopPropagation();
 		},
-    	start: function(event) {
-    		var touches = event.touches[0];
-    		// measure start values
-    		start = {
-    			// get initial touch coords
-    			x: touches.pageX,
-    			y: touches.pageY,
+		start: function(event) {
+			var touches = event.touches[0];
+			// measure start values
+			start = {
+				// get initial touch coords
+				x: touches.pageX,
+				y: touches.pageY,
 
-    			// store time to determine touch duration
-    			time: +new Date
-    		};
+				// store time to determine touch duration
+				time: +new Date
+			};
 
-    		// used for testing first move event
-    		isScrolling = undefined;
+			// used for testing first move event
+			isScrolling = undefined;
 
-    		// reset delta and end measurements
-    		delta = {};
+			// reset delta and end measurements
+			delta = {};
 
-    		// set the last position for the swipe
-    		// lastLeft = parseInt((inner.style.left.split('px')[0]), 10) || 0;
-    		lastLeft = -width*headIndex;
-    		
-    		// attach touchmove and touchend listeners
-    		inner.addEventListener('touchmove', this, false);
-    		inner.addEventListener('touchend', this, false);
-    	},
-    	move: function(event) {
-    		// ensure swiping with one touch and not pinching
-    		if ( event.touches.length > 1 || event.scale && event.scale !== 1) return
-    		if (options.disableScroll) event.preventDefault();
+			// set the last position for the swipe
+			lastLeft = parseInt((inner.style.left.split('px')[0]), 10) || 0;
+			// lastLeft = -width*headIndex;
 
-    		var touches = event.touches[0];
+			// attach touchmove and touchend listeners
+			inner.addEventListener('touchmove', this, false);
+			inner.addEventListener('touchend', this, false);
+		},
+		move: function(event) {
+			// ensure swiping with one touch and not pinching
+			if (event.touches.length > 1 || event.scale && event.scale !== 1) return
+			if (options.disableScroll) event.preventDefault();
 
-    		// measure change in x and y
-    		delta = {
-    			x: touches.pageX - start.x,
-    			y: touches.pageY - start.y
-    		}
+			var touches = event.touches[0];
 
-    		// determine if scrolling test has run - one time test
-    		if ( typeof isScrolling == 'undefined') {
-    			isScrolling = !!( isScrolling || Math.abs(delta.x) < Math.abs(delta.y) );
-    		}
+			// measure change in x and y
+			delta = {
+				x: touches.pageX - start.x,
+				y: touches.pageY - start.y
+			}
 
-    		// if user is not trying to scroll vertically
-    		if (!isScrolling) {
-    			// prevent native scrolling
-    			event.preventDefault();
-    			
-    			// stop slideshow
-    			stop();
+			// determine if scrolling test has run - one time test
+			if (typeof isScrolling == 'undefined') {
+				isScrolling = !!(isScrolling || Math.abs(delta.x) < Math.abs(delta.y));
+			}
 
-    			// move the entire widget with finger gesture
-    			inner.style.left = delta.x + lastLeft + 'px';
-    		}
-    	},
-    	end: function(event) {
-    		// measure duration
-    		var duration = +new Date - start.time;
-    		
-    		// determine if slide attempt triggers next/prev slide
-    		var isValidSlide =
-    			Number(duration) < 250               // if slide duration is less than 250ms
-    			&& Math.abs(delta.x) > 20            // and if slide amt is greater than 20px
-    			|| Math.abs(delta.x) > width/2;      // or if slide amt is greater than half the width
+			// if user is not trying to scroll vertically
+			if (!isScrolling) {
+				// prevent native scrolling
+				event.preventDefault();
 
-    		var velocity = delta.x/duration;
-    		var inertia  = velocity * Math.abs(velocity) * smoothness;
-    		var elapse   = 2 * Math.abs(velocity) * smoothness;
+				// stop slideshow
+				stop();
 
-    		console.log('distance: ' + Math.abs(delta.x) + '	duration: ' + duration + '	velocity: ' + velocity );
-    		console.log('inertia: ' + inertia + '	elapse: ' + elapse);
+				// move the entire widget with finger gesture, maybe hoist to top
+				inner.style.left = delta.x + lastLeft + 'px';
+			}
+		},
+		end: function(event) {
+			// measure duration
+			var duration = +new Date - start.time;
 
-    		// determine if slide attempt is past start and end
-    		var isPastBounds =
-    			!index && delta.x > 0                            // if first slide and slide amt is greater than 0
-    			|| index == slides.length - 1 && delta.x < 0;    // or if last slide and slide amt is less than 0
+			// determine if slide attempt triggers next/prev slide
+			var isValidSlide =
+				Number(duration) < 250 // if slide duration is less than 250ms
+				&& Math.abs(delta.x) > 20 // and if slide amt is greater than 20px
+				|| Math.abs(delta.x) > width / 2; // or if slide amt is greater than half the width
 
-    		if (options.continuous) isPastBounds = false;
+			var velocity = delta.x / duration;
+			var inertia = velocity * Math.abs(velocity) * smoothness;
+			var elapse = 2 * Math.abs(velocity) * smoothness;
 
-    		// determine direction of swipe (true:right, false:left)
-    		var direction = delta.x < 0;
+			console.log('distance: ' + Math.abs(delta.x) + '	duration: ' + duration + '	velocity: ' + velocity);
+			console.log('inertia: ' + inertia + '	elapse: ' + elapse);
 
-		   	// if not scrolling vertically
-    		if (!isScrolling) {
-    			if (isValidSlide) {
-    				// this variable keep how many units to slide
-		    		var swiped = options.sticky ? 1 : Math.round(Math.abs(delta.x+inertia)/width);
+			// determine if slide attempt is past start and end
+			var isPastBounds = !index && delta.x > 0 // if first slide and slide amt is greater than 0
+				|| index == slides.length - 1 && delta.x < 0; // or if last slide and slide amt is less than 0
 
-		    		// what if swiped is larger than the number of total units?  swiped <= hidden
-		    		swiped = swiped < hidden ? swiped : hidden;
-		    		console.log('hidden: ' + hidden  + ' headIndex: ' + headIndex + ' swiped: ' + swiped + '			precise: ' + Math.abs(delta.x+inertia)/width);
+			if (options.continuous) isPastBounds = false;
 
-		    		// circulate units if necessary
-    				if (direction) {
-    					if ( headIndex+swiped > hidden ) {
-    						// reached left bound
-    						if (options.continuous) {
-    							circulate( 'left', hidden );
-								animate(lastLeft+delta.x, lastLeft+delta.x+hidden*width);
-    							animate(lastLeft+delta.x+hidden*width, lastLeft+delta.x+hidden*width+inertia, elapse);
-    						} else {
-    							animate(lastLeft+delta.x, lastLeft+delta.x+inertia, elapse);
-    						}
+			// determine direction of swipe (true:right, false:left)
+			var direction = delta.x < 0;
+
+			// if not scrolling vertically
+			if (!isScrolling) {
+				if (isValidSlide) {
+					// this variable keep how many units to slide
+					var swiped = options.sticky ? 1 : Math.round(Math.abs(delta.x + inertia) / width);
+
+					// what if swiped is larger than the number of total units?  swiped <= hidden
+					swiped = swiped < hidden ? swiped : hidden;
+					console.log('hidden: ' + hidden + ' headIndex: ' + headIndex + ' swiped: ' + swiped + '			precise: ' + Math.abs(delta.x + inertia) / width);
+
+					// circulate units if necessary
+					if (direction) {
+						if (headIndex + swiped > hidden) {
+							// reached left bound
+							if (options.continuous) {
+								circulate('left', hidden);
+								animate(lastLeft + delta.x, lastLeft + delta.x + hidden * width);
+								animate(lastLeft + delta.x + hidden * width, lastLeft + delta.x + hidden * width + inertia, elapse);
+							} else {
+								animate(lastLeft + delta.x, lastLeft + delta.x + inertia, elapse);
+							}
 						} else {
 							// emulate inertia, apply law of physics
-    						animate(lastLeft+delta.x, lastLeft+delta.x+inertia, elapse);
+							animate(lastLeft + delta.x, lastLeft + delta.x + inertia, elapse);
 						}
-    				} else {
-    					if ( headIndex-swiped < 0 ) {
-    						// reached right bound
-    						if (options.continuous) {
-	    						circulate( 'right', hidden );
-	    						animate(lastLeft+delta.x, lastLeft+delta.x-hidden*width);
-	    						animate(lastLeft+delta.x-hidden*width, lastLeft+delta.x-hidden*width+inertia, elapse);
-    						} else {
-    							animate(lastLeft+delta.x, lastLeft+delta.x+inertia, elapse);
-    						}
-    					} else {
-    						// emulate inertia, apply law of physics
-    						animate(lastLeft+delta.x, lastLeft+delta.x+inertia, elapse);
-    					}
-    				}
+					} else {
+						if (headIndex - swiped < 0) {
+							// reached right bound
+							if (options.continuous) {
+								circulate('right', hidden);
+								animate(lastLeft + delta.x, lastLeft + delta.x - hidden * width);
+								animate(lastLeft + delta.x - hidden * width, lastLeft + delta.x - hidden * width + inertia, elapse);
+							} else {
+								animate(lastLeft + delta.x, lastLeft + delta.x + inertia, elapse);
+							}
+						} else {
+							// emulate inertia, apply law of physics
+							animate(lastLeft + delta.x, lastLeft + delta.x + inertia, elapse);
+						}
+					}
 
-    				setTimeout(function(){
-    					// if going left
-	    				if (direction) {
-	    					if (options.continuous) {
-    							if ( headIndex+swiped > hidden ) {
-	    							animate(lastLeft+delta.x+hidden*width+inertia, lastLeft+hidden*width-swiped*width, speed);
-	    							headIndex = headIndex-hidden;
-	    						} else {
-	    							animate(lastLeft+delta.x+inertia, lastLeft-swiped*width, speed);
-	    						}
-	    					} else {
-	    						if ( headIndex+swiped > hidden ) {
-	    							animate(lastLeft+delta.x+inertia, -(hidden+1)*width, speed);
-	    							headIndex = hidden-swiped+1;
-	    						} else {
-	    							animate(lastLeft+delta.x+inertia, lastLeft-swiped*width, speed);
-	    						}
-	    					}
-	    					
-	    					headIndex = headIndex + swiped;
-	    				} else {
-	    				// if going right
-	    					if (options.continuous) {
-	    						if ( headIndex-swiped < 0 ) {
-	    							animate(lastLeft+delta.x-hidden*width+inertia, lastLeft-hidden*width+swiped*width, speed );
-	    							headIndex = headIndex+hidden;
-	    						} else {
-	    							animate(lastLeft+delta.x+inertia, lastLeft+swiped*width, speed);
-	    						}
-	    					} else {
-	    						if ( headIndex-swiped < 0 ) {
-	    							animate(lastLeft+delta.x+inertia, 0, speed);
-	    							headIndex = swiped;
-	    						} else {
-	    							animate(lastLeft+delta.x+inertia, lastLeft+swiped*width, speed);
-	    						}
-	    					}
+					setTimeout(function() {
+						// if going left
+						if (direction) {
+							if (options.continuous) {
+								if (headIndex + swiped > hidden) {
+									animate(lastLeft + delta.x + hidden * width + inertia, lastLeft + hidden * width - swiped * width, speed);
+									headIndex = headIndex - hidden;
+								} else {
+									animate(lastLeft + delta.x + inertia, lastLeft - swiped * width, speed);
+								}
+							} else {
+								if (headIndex + swiped > hidden) {
+									animate(lastLeft + delta.x + inertia, -(hidden + 1) * width, speed);
+									headIndex = hidden - swiped + 1;
+								} else {
+									animate(lastLeft + delta.x + inertia, lastLeft - swiped * width, speed);
+								}
+							}
+
+							headIndex = headIndex + swiped;
+						} else {
+							// if going right
+							if (options.continuous) {
+								if (headIndex - swiped < 0) {
+									animate(lastLeft + delta.x - hidden * width + inertia, lastLeft - hidden * width + swiped * width, speed);
+									headIndex = headIndex + hidden;
+								} else {
+									animate(lastLeft + delta.x + inertia, lastLeft + swiped * width, speed);
+								}
+							} else {
+								if (headIndex - swiped < 0) {
+									animate(lastLeft + delta.x + inertia, 0, speed);
+									headIndex = swiped;
+								} else {
+									animate(lastLeft + delta.x + inertia, lastLeft + swiped * width, speed);
+								}
+							}
 
 							headIndex = headIndex - swiped;
-	    				}
-    				}, elapse);
-    				
-    			} else {
-    				// return of original position for invalid swipe regardless continuous or not
-    				animate(lastLeft+delta.x, lastLeft, speed);
-    			}
-    		}
+						}
+					}, elapse);
 
-    		// console.log(headIndex + ': ' + headIndex*width);
+				} else {
+					// return of original position for invalid swipe regardless continuous or not
+					animate(lastLeft + delta.x, lastLeft, speed);
+				}
+			}
 
-    		// kill touchmove and touchend event listeners until touchstart called again
-    		inner.removeEventListener('touchmove', events, false);
-    		inner.removeEventListener('touchend', events, false);
-    	},
-    	transitionEnd: function(event) {
-    		if (parseInt(event.target.getAttribute('data-index'), 10) == index) {
-    			if (delay) begin();
-    			options.transitionEnd && options.transitionEnd.call(event, index, slides[index]);
-    		}
-    	}
-    }
+			// console.log(headIndex + ': ' + headIndex*width);
 
-    // trigger setup
-    setup();
+			// kill touchmove and touchend event listeners until touchstart called again
+			inner.removeEventListener('touchmove', events, false);
+			inner.removeEventListener('touchend', events, false);
+		},
+		transitionEnd: function(event) {
+			if (parseInt(event.target.getAttribute('data-index'), 10) == index) {
+				if (delay) begin();
+				options.transitionEnd && options.transitionEnd.call(event, index, slides[index]);
+			}
+		}
+	}
 
-    function restoreZoom() {
-    	width = Math.round(((window.innerHeight > window.innerWidth) ? screen.width : screen.height)/(reveal+preview));
-		inner.style.left = -width*headIndex + 'px';
-    }
-	
+	// trigger setup
+	setup();
+
+	function restoreZoom() {
+		var landscape = Math.abs(window.orientation) === 90,
+			screenWidth;
+
+		if (landscape) {
+			// Landscape. Take larger of the two dimensions.
+			screenWidth = (screen.width > screen.height) ? screen.width : screen.height;
+		} else {
+			// Take smaller of the two dimensions
+			screenWidth = (screen.width > screen.height) ? screen.height : screen.width;
+		}
+
+		outerWidth = screenWidth;
+
+		width = Math.round(outerWidth / (reveal + preview));
+		inner.style.left = -width * headIndex + 'px';
+
+		// alert( outerWidth + ' : ' + width );
+
+		container.style.width = outerWidth + 'px';
+
+		// set slide width and data-index
+
+		var pos = slides.length;
+
+		while (pos--) {
+			var slide = slides[pos];
+			slide.style.width = width + 'px';
+		}
+	}
+
 	// start auto slideshow if applicable
 	if (delay) begin();
 
@@ -490,9 +567,12 @@ function nTouch(container, options) {
 
 		// set resize event on window
 		window.addEventListener('resize', events, false);
-		window.addEventListener('orientationchange', restoreZoom, false);
+		// window.addEventListener('orientationchange', restoreZoom, false);
+
 	} else {
-		window.onresize = function () { setup() }; // to play nice with old IE
+		window.onresize = function() {
+			setup();
+		}; // to play nice with old IE
 	}
 
 	// expose the nTouch API
@@ -530,14 +610,14 @@ function nTouch(container, options) {
 		kill: function() {
 			// cancel slideshow
 			stop();
-			
+
 			// reset inner
 			inner.style.width = '';
 			inner.style.left = '';
 
 			// reset slides
 			var pos = slides.length;
-			while(pos--) {
+			while (pos--) {
 				var slide = slides[pos];
 				slide.style.width = '';
 				slide.style.left = '';
@@ -555,8 +635,7 @@ function nTouch(container, options) {
 				inner.removeEventListener('otransitionend', events, false);
 				inner.removeEventListener('transitionend', events, false);
 				window.removeEventListener('resize', events, false);
-			}
-			else {
+			} else {
 				window.onresize = null;
 			}
 		}
@@ -564,33 +643,32 @@ function nTouch(container, options) {
 }
 
 
-if ( window.jQuery || window.Zepto ) {
+if (window.jQuery || window.Zepto) {
 	(function($) {
 		$.fn.nTouch = function(params) {
 			return this.each(function() {
 				$(this).data('nTouch', new nTouch($(this)[0], params));
 			});
 		}
-	})( window.jQuery || window.Zepto )
+	})(window.jQuery || window.Zepto)
 }
 
 
 (function onDoneLoading() {
-	if (typeof nRelate === 'object' && ( nRelate.xgebcn('nr_panel').length >0 ) ){
+	if (typeof nRelate === 'object' && (nRelate.xgebcn('nr_panel').length > 0)) {
 		window.mySwipe = nTouch(document.getElementById('nrelate'), {
-			continuous	: true,
-			sticky		: false,
-			smoothness	: 100,   // [0, 100]
-			reveal	  	: 2,     // [1, 4]
-			preview   	: 0.3    // [0, 0.5]
+			continuous: true,
+			sticky: false,
+			smoothness: 100, // [0, 100]
+			reveal: 2, // [1, 4]
+			preview: 0.3, // [0, 0.5]
+			leftPos: 23
 		});
 	} else {
-		setTimeout( function(){
+		setTimeout(function() {
 			onDoneLoading();
-		}, 1000 );
+		}, 1000);
 	}
 })();
 
 // onDoneLoading();
-
-
